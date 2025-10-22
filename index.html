@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>プロンプトストッカー</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>画像生成プロンプト管理</h1>
+        
+        <!-- フォーム -->
+        <div class="form-section">
+            <h2>新規プロンプト追加</h2>
+            <form id="prompt-form">
+                <div class="form-group">
+                    <label for="name">名前 (必須、1〜20文字):</label>
+                    <input type="text" id="name" required minlength="1" maxlength="20">
+                </div>
+                <div class="form-group">
+                    <label for="comment">コメント (任意、1〜40文字):</label>
+                    <input type="text" id="comment" maxlength="40">
+                </div>
+                <div class="form-group">
+                    <label for="tags">タグ (複数可能、1件1〜10文字):</label>
+                    <input type="text" id="tags" placeholder="タグをカンマ区切りで入力">
+                </div>
+                <div class="form-group">
+                    <label for="prompt">プロンプト (必須、1〜400文字):</label>
+                    <textarea id="prompt" required minlength="1" maxlength="400"></textarea>
+                </div>
+                <button type="submit">追加</button>
+                <button type="button" id="cancel-btn" style="display: none;">キャンセル</button>
+            </form>
+        </div>
+        
+        <!-- 検索・フィルター -->
+        <div class="filter-section">
+            <input type="text" id="search" placeholder="名前やタグで検索">
+            <button id="export-btn">データをエクスポート</button>
+            <button id="import-btn">データをインポート</button>
+            <input type="file" id="import-file" accept=".json" style="display: none;">
+        </div>
+        
+        <!-- 一覧 -->
+        <div class="list-section">
+            <h2>プロンプト一覧</h2>
+            <div id="prompt-list" class="prompt-list"></div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
