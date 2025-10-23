@@ -54,7 +54,7 @@ MIT License
 
 ## 作者
 
-[Your Name]
+海野 晋平
 
 ## バージョン
 
