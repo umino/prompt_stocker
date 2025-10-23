@@ -8,6 +8,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const cancelBtn = document.getElementById('cancel-btn');
     const gridModeBtn = document.getElementById('grid-mode-btn');
     const listModeBtn = document.getElementById('list-mode-btn');
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsModal = document.getElementById('settings-modal');
+    const closeModal = document.getElementById('close-modal');
+    const autoSaveCheckbox = document.getElementById('auto-save');
 
     let prompts = [];
     let editingId = null;
@@ -54,6 +58,38 @@ document.addEventListener('DOMContentLoaded', function() {
 
     listModeBtn.addEventListener('click', function() {
         setDisplayMode('list');
+    });
+
+    // 設定ボタン
+    settingsBtn.addEventListener('click', function() {
+        openSettingsModal();
+    });
+
+    // モーダル閉じるボタン
+    closeModal.addEventListener('click', function() {
+        closeSettingsModal();
+    });
+
+    // モーダルオーバーレイクリックで閉じる
+    settingsModal.addEventListener('click', function(e) {
+        if (e.target === settingsModal) {
+            closeSettingsModal();
+        }
+    });
+
+    // 自動保存チェックボックスの変更を監視
+    autoSaveCheckbox.addEventListener('change', function() {
+        const isAutoSave = this.checked;
+        // 自動保存設定をlocalStorageに保存
+        localStorage.setItem('auto_save_enabled', isAutoSave);
+        console.log('自動保存設定:', isAutoSave ? '有効' : '無効');
+    });
+
+    // Escapeキーでモーダルを閉じる
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && settingsModal.classList.contains('show')) {
+            closeSettingsModal();
+        }
     });
 
     function setDisplayMode(mode) {
@@ -125,7 +161,13 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             prompts.push(newPrompt);
         }
-        saveData();
+
+        // 自動保存設定をチェックして保存
+        const autoSaveEnabled = localStorage.getItem('auto_save_enabled') !== 'false';
+        if (autoSaveEnabled) {
+            saveData();
+        }
+
         form.reset();
         renderPrompts();
     }
@@ -242,8 +284,26 @@ document.addEventListener('DOMContentLoaded', function() {
             displayMode = savedMode;
         }
 
+        // 保存された自動保存設定を読み込み
+        const autoSaveEnabled = localStorage.getItem('auto_save_enabled');
+        if (autoSaveEnabled !== null) {
+            autoSaveCheckbox.checked = autoSaveEnabled === 'true';
+        }
+
         // 初期表示モードを設定
         setDisplayMode(displayMode);
+    }
+
+    // モーダルを開く
+    function openSettingsModal() {
+        settingsModal.classList.add('show');
+        document.body.style.overflow = 'hidden'; // 背景スクロールを無効化
+    }
+
+    // モーダルを閉じる
+    function closeSettingsModal() {
+        settingsModal.classList.remove('show');
+        document.body.style.overflow = ''; // 背景スクロールを有効化
     }
 
     function exportData() {
