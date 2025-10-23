@@ -160,6 +160,12 @@ button:hover {
     border-radius: 12px;
     font-size: 12px;
     margin-right: 5px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.prompt-card .tag:hover {
+    background-color: #dee2e6;
 }
 
 .prompt-card .actions {
@@ -231,6 +237,12 @@ button:hover {
     font-size: 12px;
     margin-right: 5px;
     margin-bottom: 2px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.prompt-table .tag:hover {
+    background-color: #dee2e6;
 }
 
 .prompt-text-cell {

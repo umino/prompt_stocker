@@ -200,7 +200,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <tr>
                             <td>${prompt.name}</td>
                             <td>${prompt.comment || '-'}</td>
-                            <td>${prompt.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</td>
+                            <td>${prompt.tags.map(tag => `<span class="tag" onclick="setSearchTag('${tag}')">${tag}</span>`).join('')}</td>
                             <td class="prompt-text-cell">${prompt.prompt}</td>
                             <td class="actions-cell">
                                 <button class="copy" onclick="copyPrompt(${prompt.id})">コピー</button>
@@ -221,7 +221,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <h3>${prompt.name}</h3>
                     ${prompt.comment ? `<p><strong>コメント:</strong> ${prompt.comment}</p>` : ''}
                     <div class="tags">
-                        ${prompt.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                        ${prompt.tags.map(tag => `<span class="tag" onclick="setSearchTag('${tag}')">${tag}</span>`).join('')}
                     </div>
                     <p class="prompt-text">${prompt.prompt}</p>
                     <div class="actions">
@@ -255,6 +255,12 @@ document.addEventListener('DOMContentLoaded', function() {
             saveData();
             renderPrompts();
         }
+    };
+
+    window.setSearchTag = function(tag) {
+        const searchInput = document.getElementById('search');
+        searchInput.value = tag;
+        searchInput.dispatchEvent(new Event('input')); // 検索を即時実行
     };
 
     window.copyPrompt = function(id) {
