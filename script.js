@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('prompt-form');
     const promptList = document.getElementById('prompt-list');
     const searchInput = document.getElementById('search');
+    const clearSearchBtn = document.getElementById('clear-search');
     const exportBtn = document.getElementById('export-btn');
     const importBtn = document.getElementById('import-btn');
     const importFile = document.getElementById('import-file');
@@ -30,7 +31,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 検索
     searchInput.addEventListener('input', function() {
+        clearSearchBtn.style.display = this.value ? 'block' : 'none';
         renderPrompts();
+    });
+
+    // 検索クリア
+    clearSearchBtn.addEventListener('click', function() {
+        searchInput.value = '';
+        clearSearchBtn.style.display = 'none';
+        renderPrompts();
+        searchInput.focus();
     });
 
     // エクスポート

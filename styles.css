@@ -79,9 +79,36 @@ button:hover {
     gap: 10px;
 }
 
-#search {
-    flex: 1;
+.search-container {
+    position: relative;
     max-width: 300px;
+    width: 100%;
+}
+
+#search {
+    width: 100%;
+    padding-right: 30px;
+}
+
+.clear-search-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 4px 8px;
+    margin: 0;
+    display: none;
+    font-size: 14px;
+    border-radius: 50%;
+}
+
+.clear-search-btn:hover {
+    background-color: #f0f0f0;
+    color: #333;
 }
 
 .settings-btn {
