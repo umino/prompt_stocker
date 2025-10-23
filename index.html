@@ -39,18 +39,17 @@
             </form>
         </div>
         
-        <!-- 検索・フィルター -->
-        <div class="filter-section">
-            <div class="search-container">
-                <input type="text" id="search" placeholder="名前やタグで検索">
-                <button id="clear-search" class="clear-search-btn" title="検索をクリア">✕</button>
-            </div>
-        </div>
-        
-        <!-- 一覧 -->
+        <!-- 一覧セクション -->
         <div class="list-section">
+            <!-- 一覧ヘッダー（検索・フィルター・表示切替） -->
             <div class="list-header">
-                <h2>プロンプト一覧</h2>
+                <div class="list-header-left">
+                    <h2>プロンプト一覧</h2>
+                    <div class="search-container">
+                        <input type="text" id="search" placeholder="名前やタグで検索">
+                        <button id="clear-search" class="clear-search-btn" title="検索をクリア">✕</button>
+                    </div>
+                </div>
                 <div class="mode-controls">
                     <button id="grid-mode-btn" class="mode-btn active" title="カード表示">
                         <span class="mode-icon">⊞</span>
@@ -60,7 +59,10 @@
                     </button>
                 </div>
             </div>
-            <div id="prompt-list" class="prompt-list"></div>
+            <!-- スクロール可能なプロンプトリストエリア -->
+            <div class="prompt-list-container">
+                <div id="prompt-list" class="prompt-list"></div>
+            </div>
         </div>
     </div>
 
