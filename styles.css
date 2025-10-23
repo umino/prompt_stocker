@@ -76,6 +76,32 @@ button:hover {
     gap: 20px;
 }
 
+.prompt-list.list-mode {
+    display: block;
+}
+
+.mode-btn {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-right: 5px;
+}
+
+.mode-btn:hover {
+    background-color: #5a6268;
+}
+
+.mode-btn.active {
+    background-color: #007bff;
+}
+
+.mode-btn.active:hover {
+    background-color: #0056b3;
+}
+
 .prompt-card {
     border: 1px solid #ddd;
     border-radius: 8px;
@@ -114,6 +140,10 @@ button:hover {
     margin-right: 5px;
 }
 
+.prompt-card .actions button.copy {
+    background-color: #17a2b8;
+}
+
 .prompt-card .actions button.edit {
     background-color: #ffc107;
     color: #212529;
@@ -131,4 +161,74 @@ button:hover {
     font-style: italic;
     color: #666;
     white-space: pre-wrap;
+}
+
+/* リストモード（テーブル）のスタイル */
+.prompt-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.prompt-table th,
+.prompt-table td {
+    border: 1px solid #ddd;
+    padding: 12px;
+    text-align: left;
+    vertical-align: top;
+}
+
+.prompt-table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+    color: #333;
+}
+
+.prompt-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.prompt-table tr:hover {
+    background-color: #f5f5f5;
+}
+
+.prompt-table .tag {
+    display: inline-block;
+    background-color: #e9ecef;
+    padding: 2px 6px;
+    border-radius: 12px;
+    font-size: 12px;
+    margin-right: 5px;
+    margin-bottom: 2px;
+}
+
+.prompt-text-cell {
+    font-style: italic;
+    color: #666;
+    white-space: pre-wrap;
+    max-width: 300px;
+    word-wrap: break-word;
+}
+
+.actions-cell button {
+    background-color: #28a745;
+    margin-right: 5px;
+    margin-bottom: 2px;
+}
+
+.actions-cell button.copy {
+    background-color: #17a2b8;
+}
+
+.actions-cell button.edit {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.actions-cell button.delete {
+    background-color: #dc3545;
+}
+
+.actions-cell button:hover {
+    opacity: 0.8;
 }

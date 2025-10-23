@@ -6,10 +6,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const importBtn = document.getElementById('import-btn');
     const importFile = document.getElementById('import-file');
     const cancelBtn = document.getElementById('cancel-btn');
+    const gridModeBtn = document.getElementById('grid-mode-btn');
+    const listModeBtn = document.getElementById('list-mode-btn');
 
     let prompts = [];
     let editingId = null;
+    let displayMode = 'grid'; // 'grid' or 'list'
     const STORAGE_KEY = 'prompts_data';
+    const DISPLAY_MODE_KEY = 'display_mode';
 
     // 初期データ読み込み
     loadData();
@@ -42,6 +46,32 @@ document.addEventListener('DOMContentLoaded', function() {
         cancelBtn.style.display = 'none';
         form.reset();
     });
+
+    // モード切り替え
+    gridModeBtn.addEventListener('click', function() {
+        setDisplayMode('grid');
+    });
+
+    listModeBtn.addEventListener('click', function() {
+        setDisplayMode('list');
+    });
+
+    function setDisplayMode(mode) {
+        displayMode = mode;
+
+        // ボタンのアクティブ状態を更新
+        gridModeBtn.classList.toggle('active', mode === 'grid');
+        listModeBtn.classList.toggle('active', mode === 'list');
+
+        // プロンプトリストのクラスを更新
+        promptList.className = `prompt-list ${mode}-mode`;
+
+        // 表示モードをlocalStorageに保存
+        localStorage.setItem(DISPLAY_MODE_KEY, mode);
+
+        // プロンプトを再描画
+        renderPrompts();
+    }
 
     function addPrompt() {
         const name = document.getElementById('name').value.trim();
@@ -80,7 +110,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 tags,
                 prompt
             };
-            prompts.push(updatedPrompt);
+            prompts = prompts.map(p => p.id === editingId ? updatedPrompt : p);
             editingId = null;
             form.querySelector('button[type="submit"]').textContent = '追加';
             cancelBtn.style.display = 'none';
@@ -102,29 +132,65 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function renderPrompts() {
         const searchTerm = searchInput.value.toLowerCase();
-        const filteredPrompts = prompts.filter(p => 
-            p.name.toLowerCase().includes(searchTerm) || 
+        const filteredPrompts = prompts.filter(p =>
+            p.name.toLowerCase().includes(searchTerm) ||
             p.tags.some(tag => tag.toLowerCase().includes(searchTerm))
         );
 
         promptList.innerHTML = '';
-        filteredPrompts.forEach(prompt => {
-            const card = document.createElement('div');
-            card.className = 'prompt-card';
-            card.innerHTML = `
-                <h3>${prompt.name}</h3>
-                ${prompt.comment ? `<p><strong>コメント:</strong> ${prompt.comment}</p>` : ''}
-                <div class="tags">
-                    ${prompt.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
-                </div>
-                <p class="prompt-text">${prompt.prompt}</p>
-                <div class="actions">
-                    <button class="edit" onclick="editPrompt(${prompt.id})">編集</button>
-                    <button class="delete" onclick="deletePrompt(${prompt.id})">削除</button>
-                </div>
+
+        if (displayMode === 'list') {
+            // リストモード（テーブル形式）
+            const table = document.createElement('table');
+            table.className = 'prompt-table';
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>名前</th>
+                        <th>コメント</th>
+                        <th>タグ</th>
+                        <th>プロンプト</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${filteredPrompts.map(prompt => `
+                        <tr>
+                            <td>${prompt.name}</td>
+                            <td>${prompt.comment || '-'}</td>
+                            <td>${prompt.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</td>
+                            <td class="prompt-text-cell">${prompt.prompt}</td>
+                            <td class="actions-cell">
+                                <button class="copy" onclick="copyPrompt(${prompt.id})">コピー</button>
+                                <button class="edit" onclick="editPrompt(${prompt.id})">編集</button>
+                                <button class="delete" onclick="deletePrompt(${prompt.id})">削除</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
             `;
-            promptList.appendChild(card);
-        });
+            promptList.appendChild(table);
+        } else {
+            // グリッドモード（カード形式）
+            filteredPrompts.forEach(prompt => {
+                const card = document.createElement('div');
+                card.className = 'prompt-card';
+                card.innerHTML = `
+                    <h3>${prompt.name}</h3>
+                    ${prompt.comment ? `<p><strong>コメント:</strong> ${prompt.comment}</p>` : ''}
+                    <div class="tags">
+                        ${prompt.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                    </div>
+                    <p class="prompt-text">${prompt.prompt}</p>
+                    <div class="actions">
+                        <button class="copy" onclick="copyPrompt(${prompt.id})">コピー</button>
+                        <button class="edit" onclick="editPrompt(${prompt.id})">編集</button>
+                        <button class="delete" onclick="deletePrompt(${prompt.id})">削除</button>
+                    </div>
+                `;
+                promptList.appendChild(card);
+            });
+        }
     }
 
     window.editPrompt = function(id) {
@@ -149,6 +215,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
+    window.copyPrompt = function(id) {
+        const prompt = prompts.find(p => p.id === id);
+        if (!prompt) return;
+
+        navigator.clipboard.writeText(prompt.prompt).then(function() {
+            alert('プロンプトをクリップボードにコピーしました。');
+        }).catch(function(err) {
+            alert('コピーに失敗しました。');
+        });
+    };
+
     function saveData() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts));
     }
@@ -158,7 +235,15 @@ document.addEventListener('DOMContentLoaded', function() {
         if (data) {
             prompts = JSON.parse(data);
         }
-        renderPrompts();
+
+        // 保存された表示モードを読み込み
+        const savedMode = localStorage.getItem(DISPLAY_MODE_KEY);
+        if (savedMode && (savedMode === 'grid' || savedMode === 'list')) {
+            displayMode = savedMode;
+        }
+
+        // 初期表示モードを設定
+        setDisplayMode(displayMode);
     }
 
     function exportData() {
