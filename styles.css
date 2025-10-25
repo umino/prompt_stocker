@@ -16,6 +16,7 @@ body {
     flex-direction: column;
     height: 100vh;
     box-sizing: border-box;
+    overflow: hidden;
 }
 
 body {
@@ -45,16 +46,25 @@ h2 {
     color: #333;
 }
 
-.form-section, .filter-section, .list-section {
+.form-section {
+    background-color: #fff;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.list-section {
     display: flex;
     flex-direction: column;
     flex: 1;
     min-height: 0;
-    margin-bottom: 30px;
     background-color: #fff;
     border: 1px solid #eee;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    overflow: hidden;
 }
 
 .prompt-list-container {
