@@ -471,6 +471,37 @@ button:hover {
     line-height: 1;
 }
 
+/* トースト通知 */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #323232;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 4px;
+    font-size: 14px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    z-index: 1000;
+    opacity: 0;
+    transform: translateY(100%);
+    transition: all 0.3s ease;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast-content {
+    display: flex;
+    align-items: center;
+}
+
+.toast-message {
+    margin-right: 8px;
+}
+
 /* モーダルスタイル */
 .modal {
     display: none;

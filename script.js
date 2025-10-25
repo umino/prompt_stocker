@@ -273,14 +273,24 @@ document.addEventListener('DOMContentLoaded', function() {
         searchInput.dispatchEvent(new Event('input')); // 検索を即時実行
     };
 
+    function showToast(message, duration = 3000) {
+        const toast = document.getElementById('toast');
+        toast.querySelector('.toast-message').textContent = message;
+        toast.classList.add('show');
+
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, duration);
+    }
+
     window.copyPrompt = function(id) {
         const prompt = prompts.find(p => p.id === id);
         if (!prompt) return;
 
         navigator.clipboard.writeText(prompt.prompt).then(function() {
-            alert('プロンプトをクリップボードにコピーしました。');
+            showToast('プロンプトをコピーしました');
         }).catch(function(err) {
-            alert('コピーに失敗しました。');
+            showToast('コピーに失敗しました', 4000);
         });
     };
 
