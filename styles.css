@@ -95,10 +95,35 @@ h2 {
     margin-bottom: 15px;
 }
 
+.inline-form-group {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.inline-form-group label {
+    flex: 0 0 200px;
+    margin-bottom: 0;
+}
+
 label {
-    display: block;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
     margin-bottom: 5px;
     font-weight: bold;
+}
+
+.label-text {
+    color: #333;
+    min-width: 80px;
+}
+
+.input-hint {
+    font-weight: normal;
+    font-size: 0.85em;
+    color: #666;
+    white-space: nowrap;
 }
 
 input, textarea {
@@ -107,6 +132,13 @@ input, textarea {
     border: 1px solid #ddd;
     border-radius: 4px;
     box-sizing: border-box;
+    font-size: 14px;
+}
+
+input:focus, textarea:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
 }
 
 textarea {

@@ -18,20 +18,32 @@
         <div class="form-section">
             <h2>新規プロンプト追加</h2>
             <form id="prompt-form">
-                <div class="form-group">
-                    <label for="name">名前 (必須、〜20文字):</label>
+                <div class="form-group inline-form-group">
+                    <label for="name">
+                        <span class="label-text">名前</span>
+                        <span class="input-hint">(必須、〜20文字)</span>
+                    </label>
                     <input type="text" id="name" required minlength="1" maxlength="20">
                 </div>
-                <div class="form-group">
-                    <label for="comment">コメント (任意、〜40文字):</label>
+                <div class="form-group inline-form-group">
+                    <label for="comment">
+                        <span class="label-text">コメント</span>
+                        <span class="input-hint">(任意、〜40文字)</span>
+                    </label>
                     <input type="text" id="comment" maxlength="40">
                 </div>
-                <div class="form-group">
-                    <label for="tags">タグ (複数可能、1件 〜10文字):</label>
+                <div class="form-group inline-form-group">
+                    <label for="tags">
+                        <span class="label-text">タグ</span>
+                        <span class="input-hint">(複数可能、1件〜10文字)</span>
+                    </label>
                     <input type="text" id="tags" placeholder="タグをカンマ区切りで入力">
                 </div>
                 <div class="form-group">
-                    <label for="prompt">プロンプト (必須、〜400文字):</label>
+                    <label for="prompt">
+                        <span class="label-text">プロンプト</span>
+                        <span class="input-hint">(必須、〜400文字)</span>
+                    </label>
                     <textarea id="prompt" required minlength="1" maxlength="400"></textarea>
                 </div>
                 <button type="submit">追加</button>
