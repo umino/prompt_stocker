@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let prompts = [];
     let editingId = null;
     let displayMode = 'grid'; // 'grid' or 'list'
+    let searchMode = 'partial'; // 'partial' (default) or 'exact'
     const STORAGE_KEY = 'prompts_data';
     const DISPLAY_MODE_KEY = 'display_mode';
 
@@ -32,8 +33,49 @@ document.addEventListener('DOMContentLoaded', function() {
     // 検索
     searchInput.addEventListener('input', function() {
         clearSearchBtn.style.display = this.value ? 'block' : 'none';
+        // 検索モードを切り替え、再描画を実行
         renderPrompts();
     });
+
+    // --- [追加] 検索モード切替ボタンの初期化とイベント設定 ---
+    const toggleModeBtn = document.createElement('button');
+    toggleModeBtn.textContent = '部分'; // 初期表示は部分一致
+    toggleModeBtn.className = 'search-mode-toggle-btn';
+    toggleModeBtn.style.marginLeft = '10px';
+    toggleModeBtn.style.backgroundColor = '#00887B';
+    toggleModeBtn.style.whiteSpace = 'nowrap';
+    // 検索入力フィールドの親要素（または適切なコンテナ）にボタンを追加
+    searchInput.parentNode.insertBefore(toggleModeBtn, searchInput);
+
+    // イベントリスナーの設定
+    toggleModeBtn.addEventListener('click', function() {
+        window.toggleSearchMode(); // 定義済みの関数を呼び出し
+    });
+
+     // 親要素（searchInputの親）を取得し、Flexboxを設定する
+    const searchContainer = searchInput.parentNode;
+    searchContainer.style.display = 'flex';
+    searchContainer.style.alignItems = 'center';
+
+    // ボタンを検索入力の左に配置するために、searchInputの前に挿入
+    searchContainer.insertBefore(toggleModeBtn, searchInput);
+
+    // -----------------------------------------------------
+
+    // 新しい関数：検索モードのトグルと実行
+    window.toggleSearchMode = function() {
+        if (searchMode === 'partial') {
+            searchMode = 'exact';
+            toggleModeBtn.textContent = '完全';
+            console.log('検索モード: 完全一致 (Exact) に切り替えました');
+        } else {
+            searchMode = 'partial';
+            toggleModeBtn.textContent = '部分';
+            console.log('検索モード: 部分一致 (Partial) に切り替えました');
+        }
+        // 検索実行と再描画
+        renderPrompts();
+    };
 
     // 検索クリア
     clearSearchBtn.addEventListener('click', function() {
@@ -125,25 +167,25 @@ document.addEventListener('DOMContentLoaded', function() {
         const tagsInput = document.getElementById('tags').value.trim();
         const prompt = document.getElementById('prompt').value.trim();
 
-        if (!name || name.length < 1 || name.length > 20) {
-            alert('名前は1〜20文字で入力してください。');
+        if (!name || name.length < 1 || name.length > 80) {
+            alert('名前は1〜80文字で入力してください。');
             return;
         }
 
-        if (comment && (comment.length < 1 || comment.length > 40)) {
-            alert('コメントは1〜40文字で入力してください。');
+        if (comment && (comment.length < 1 || comment.length > 200)) {
+            alert('コメントは1〜200文字で入力してください。');
             return;
         }
 
-        if (!prompt || prompt.length < 1 || prompt.length > 400) {
-            alert('プロンプトは1〜400文字で入力してください。');
+        if (!prompt || prompt.length < 1 || prompt.length > 4000) {
+            alert('プロンプトは1〜4000文字で入力してください。');
             return;
         }
 
-        const tags = tagsInput ? tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag.length >= 1 && tag.length <= 10) : [];
+        const tags = tagsInput ? tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag.length >= 1 && tag.length <= 20) : [];
 
-        if (tags.some(tag => tag.length < 1 || tag.length > 10)) {
-            alert('各タグは1〜10文字で入力してください。');
+        if (tags.some(tag => tag.length < 1 || tag.length > 20)) {
+            alert('各タグは1〜20文字で入力してください。');
             return;
         }
 
@@ -184,11 +226,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function renderPrompts() {
         const searchTerm = searchInput.value.toLowerCase();
-        const filteredPrompts = prompts.filter(p =>
-            p.name.toLowerCase().includes(searchTerm) ||
-            p.tags.some(tag => tag.toLowerCase().includes(searchTerm))
-        );
+        const filteredPrompts = prompts.filter(p => {
+            // 名前での検索
+            let nameMatch = false;
+            if (searchMode === 'partial') {
+                nameMatch = p.name.toLowerCase().includes(searchTerm);
+            } else { // exact mode
+                nameMatch = p.name.toLowerCase() === searchTerm;
+            }
 
+            // タグでの検索
+            let tagMatch = false;
+            if (searchMode === 'partial') {
+                tagMatch = p.tags.some(tag => tag.toLowerCase().includes(searchTerm));
+            } else { // exact mode
+                tagMatch = p.tags.some(tag => tag.toLowerCase() === searchTerm);
+            }
+
+            return nameMatch || tagMatch;
+        });
         promptList.innerHTML = '';
 
         if (displayMode === 'list') {
