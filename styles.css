@@ -543,6 +543,7 @@ button[type="submit"]:hover {
   word-break: break-all;
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   margin-bottom: 12px;
@@ -932,4 +933,51 @@ button[type="submit"]:hover {
 }
 *::-webkit-scrollbar { width: 6px; height: 6px; }
 *::-webkit-scrollbar-track { background: transparent; }
-*::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 3px; }
+/* ── 一括コピーボタン ── */
+.bulk-copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(0,212,170,.12);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(0,212,170,.3);
+  border-radius: var(--radius-sm);
+  padding: 0 12px;
+  height: 32px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+  margin: 0;
+}
+
+.bulk-copy-btn:hover {
+  background: rgba(0,212,170,.22);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 12px rgba(0,212,170,.2);
+  transform: translateY(-1px);
+}
+
+.bulk-copy-btn.copied {
+  background: rgba(0,212,170,.3);
+  border-color: var(--accent-cyan);
+  color: #fff;
+  box-shadow: 0 0 20px rgba(0,212,170,.35);
+}
+
+.bulk-copy-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+@keyframes bulkCopyFlash {
+  0%   { box-shadow: 0 0  0px rgba(0,212,170,0); }
+  50%  { box-shadow: 0 0 24px rgba(0,212,170,.6); }
+  100% { box-shadow: 0 0 12px rgba(0,212,170,.2); }
+}
+
+.bulk-copy-btn.copied {
+  animation: bulkCopyFlash .4s ease;
+}
+

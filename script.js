@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const closeModal     = document.getElementById('close-modal');
     const autoSaveChk    = document.getElementById('auto-save');
     const countBadge     = document.getElementById('count-badge');
+    const bulkCopyBtn    = document.getElementById('bulk-copy-btn');
 
     // ── State ──
     let prompts     = [];
@@ -74,6 +75,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // キャンセル
     cancelBtn.addEventListener('click', resetForm);
+
+    // 一括コピー
+    bulkCopyBtn.addEventListener('click', bulkCopyPrompts);
 
     // 表示モード
     gridModeBtn.addEventListener('click', () => setDisplayMode('grid'));
@@ -140,6 +144,47 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(() => showToast('✓ プロンプトをコピーしました'))
             .catch(() => showToast('コピーに失敗しました', 4000));
     };
+
+    // ── 一括コピー ──
+    function bulkCopyPrompts() {
+        // 現在のフィルタを再計算
+        const term = searchInput.value.toLowerCase();
+        const filtered = term
+            ? prompts.filter(p => {
+                if (searchMode === 'partial') {
+                    return p.name.toLowerCase().includes(term) ||
+                           p.tags.some(t => t.toLowerCase().includes(term));
+                } else {
+                    return p.name.toLowerCase() === term ||
+                           p.tags.some(t => t.toLowerCase() === term);
+                }
+            })
+            : prompts;
+
+        if (filtered.length === 0) {
+            showToast('⚠ コピー対象がありません', 2500);
+            return;
+        }
+
+        // 各プロンプトの改行を除去して1行化、改行で結合
+        const text = filtered
+            .map(p => p.prompt.replace(/[\r\n]+/g, ' ').trim())
+            .join('\n');
+
+        navigator.clipboard.writeText(text)
+            .then(() => {
+                showToast(`✓ ${filtered.length} 件のプロンプトをコピーしました`);
+                // ボタンに一時的な「成功」クラスを付与
+                bulkCopyBtn.classList.add('copied');
+                bulkCopyBtn.querySelector('.bulk-copy-label').textContent = `${filtered.length} 件コピー完了`;
+                clearTimeout(bulkCopyBtn._timer);
+                bulkCopyBtn._timer = setTimeout(() => {
+                    bulkCopyBtn.classList.remove('copied');
+                    bulkCopyBtn.querySelector('.bulk-copy-label').textContent = '一括コピー';
+                }, 2500);
+            })
+            .catch(() => showToast('⚠ コピーに失敗しました', 3500));
+    }
 
     window.setSearchTag = function (tag) {
         searchInput.value = tag;
