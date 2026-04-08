@@ -1,425 +1,389 @@
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('prompt-form');
-    const promptList = document.getElementById('prompt-list');
-    const searchInput = document.getElementById('search');
+document.addEventListener('DOMContentLoaded', function () {
+    // ── DOM refs ──
+    const form           = document.getElementById('prompt-form');
+    const promptList     = document.getElementById('prompt-list');
+    const searchInput    = document.getElementById('search');
     const clearSearchBtn = document.getElementById('clear-search');
-    const exportBtn = document.getElementById('export-btn');
-    const importBtn = document.getElementById('import-btn');
-    const importFile = document.getElementById('import-file');
-    const cancelBtn = document.getElementById('cancel-btn');
-    const gridModeBtn = document.getElementById('grid-mode-btn');
-    const listModeBtn = document.getElementById('list-mode-btn');
-    const settingsBtn = document.getElementById('settings-btn');
-    const settingsModal = document.getElementById('settings-modal');
-    const closeModal = document.getElementById('close-modal');
-    const autoSaveCheckbox = document.getElementById('auto-save');
+    const exportBtn      = document.getElementById('export-btn');
+    const importBtn      = document.getElementById('import-btn');
+    const importFile     = document.getElementById('import-file');
+    const cancelBtn      = document.getElementById('cancel-btn');
+    const submitBtn      = document.getElementById('submit-btn');
+    const gridModeBtn    = document.getElementById('grid-mode-btn');
+    const listModeBtn    = document.getElementById('list-mode-btn');
+    const settingsBtn    = document.getElementById('settings-btn');
+    const settingsModal  = document.getElementById('settings-modal');
+    const closeModal     = document.getElementById('close-modal');
+    const autoSaveChk    = document.getElementById('auto-save');
+    const countBadge     = document.getElementById('count-badge');
 
-    let prompts = [];
-    let editingId = null;
-    let displayMode = 'grid'; // 'grid' or 'list'
-    let searchMode = 'partial'; // 'partial' (default) or 'exact'
-    const STORAGE_KEY = 'prompts_data';
-    const DISPLAY_MODE_KEY = 'display_mode';
+    // ── State ──
+    let prompts     = [];
+    let editingId   = null;
+    let displayMode = 'grid';
+    let searchMode  = 'partial';   // 'partial' | 'exact'
 
-    // 初期データ読み込み
+    const STORAGE_KEY    = 'prompts_data';
+    const DISPLAY_KEY    = 'display_mode';
+    const AUTO_SAVE_KEY  = 'auto_save_enabled';
+
+    // ── 検索モード切替ボタン（動的生成） ──
+    const toggleModeBtn = document.createElement('button');
+    toggleModeBtn.type = 'button';
+    toggleModeBtn.textContent = '部分';
+    toggleModeBtn.className = 'search-mode-toggle-btn';
+    toggleModeBtn.title = '検索モードを切り替え';
+    // search-container の先頭 (input の前) に挿入
+    const searchContainer = searchInput.parentNode;
+    searchContainer.insertBefore(toggleModeBtn, searchInput);
+
+    // ── 初期読み込み ──
     loadData();
 
+    // ═══════════════════════════════════════════
+    //  イベントリスナー
+    // ═══════════════════════════════════════════
+
     // フォーム送信
-    form.addEventListener('submit', function(e) {
+    form.addEventListener('submit', function (e) {
         e.preventDefault();
-        addPrompt();
+        addOrUpdatePrompt();
     });
 
     // 検索
-    searchInput.addEventListener('input', function() {
-        clearSearchBtn.style.display = this.value ? 'block' : 'none';
-        // 検索モードを切り替え、再描画を実行
+    searchInput.addEventListener('input', function () {
+        clearSearchBtn.style.display = this.value ? 'flex' : 'none';
         renderPrompts();
     });
 
-    // --- [追加] 検索モード切替ボタンの初期化とイベント設定 ---
-    const toggleModeBtn = document.createElement('button');
-    toggleModeBtn.textContent = '部分'; // 初期表示は部分一致
-    toggleModeBtn.className = 'search-mode-toggle-btn';
-    toggleModeBtn.style.marginLeft = '10px';
-    toggleModeBtn.style.backgroundColor = '#00887B';
-    toggleModeBtn.style.whiteSpace = 'nowrap';
-    // 検索入力フィールドの親要素（または適切なコンテナ）にボタンを追加
-    searchInput.parentNode.insertBefore(toggleModeBtn, searchInput);
-
-    // イベントリスナーの設定
-    toggleModeBtn.addEventListener('click', function() {
-        window.toggleSearchMode(); // 定義済みの関数を呼び出し
-    });
-
-     // 親要素（searchInputの親）を取得し、Flexboxを設定する
-    const searchContainer = searchInput.parentNode;
-    searchContainer.style.display = 'flex';
-    searchContainer.style.alignItems = 'center';
-
-    // ボタンを検索入力の左に配置するために、searchInputの前に挿入
-    searchContainer.insertBefore(toggleModeBtn, searchInput);
-
-    // -----------------------------------------------------
-
-    // 新しい関数：検索モードのトグルと実行
-    window.toggleSearchMode = function() {
-        if (searchMode === 'partial') {
-            searchMode = 'exact';
-            toggleModeBtn.textContent = '完全';
-            console.log('検索モード: 完全一致 (Exact) に切り替えました');
-        } else {
-            searchMode = 'partial';
-            toggleModeBtn.textContent = '部分';
-            console.log('検索モード: 部分一致 (Partial) に切り替えました');
-        }
-        // 検索実行と再描画
+    // 検索モード切替
+    toggleModeBtn.addEventListener('click', function () {
+        searchMode = searchMode === 'partial' ? 'exact' : 'partial';
+        toggleModeBtn.textContent = searchMode === 'partial' ? '部分' : '完全';
+        toggleModeBtn.classList.toggle('exact-mode', searchMode === 'exact');
         renderPrompts();
-    };
+    });
 
     // 検索クリア
-    clearSearchBtn.addEventListener('click', function() {
+    clearSearchBtn.addEventListener('click', function () {
         searchInput.value = '';
         clearSearchBtn.style.display = 'none';
         renderPrompts();
         searchInput.focus();
     });
 
-    // エクスポート
-    exportBtn.addEventListener('click', exportData);
-
-    // インポート
-    importBtn.addEventListener('click', function() {
-        importFile.click();
-    });
-
-    importFile.addEventListener('change', importData);
-
     // キャンセル
-    cancelBtn.addEventListener('click', function() {
-        editingId = null;
-        form.querySelector('button[type="submit"]').textContent = '追加';
-        cancelBtn.style.display = 'none';
-        form.reset();
+    cancelBtn.addEventListener('click', resetForm);
+
+    // 表示モード
+    gridModeBtn.addEventListener('click', () => setDisplayMode('grid'));
+    listModeBtn.addEventListener('click', () => setDisplayMode('list'));
+
+    // 設定
+    settingsBtn.addEventListener('click', openSettingsModal);
+    closeModal.addEventListener('click', closeSettingsModal);
+    settingsModal.addEventListener('click', (e) => {
+        if (e.target === settingsModal) closeSettingsModal();
     });
 
-    // モード切り替え
-    gridModeBtn.addEventListener('click', function() {
-        setDisplayMode('grid');
-    });
-
-    listModeBtn.addEventListener('click', function() {
-        setDisplayMode('list');
-    });
-
-    // 設定ボタン
-    settingsBtn.addEventListener('click', function() {
-        openSettingsModal();
-    });
-
-    // モーダル閉じるボタン
-    closeModal.addEventListener('click', function() {
-        closeSettingsModal();
-    });
-
-    // モーダルオーバーレイクリックで閉じる
-    settingsModal.addEventListener('click', function(e) {
-        if (e.target === settingsModal) {
-            closeSettingsModal();
-        }
-    });
-
-    // 自動保存チェックボックスの変更を監視
-    autoSaveCheckbox.addEventListener('change', function() {
-        const isAutoSave = this.checked;
-        // 自動保存設定をlocalStorageに保存
-        localStorage.setItem('auto_save_enabled', isAutoSave);
-        console.log('自動保存設定:', isAutoSave ? '有効' : '無効');
-    });
-
-    // Escapeキーでモーダルを閉じる
-    document.addEventListener('keydown', function(e) {
+    // Escape でモーダルを閉じる
+    document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && settingsModal.classList.contains('show')) {
             closeSettingsModal();
         }
     });
 
-    function setDisplayMode(mode) {
-        displayMode = mode;
+    // 自動保存
+    autoSaveChk.addEventListener('change', () => {
+        localStorage.setItem(AUTO_SAVE_KEY, autoSaveChk.checked);
+    });
 
-        // ボタンのアクティブ状態を更新
-        gridModeBtn.classList.toggle('active', mode === 'grid');
-        listModeBtn.classList.toggle('active', mode === 'list');
+    // エクスポート / インポート
+    exportBtn.addEventListener('click', exportData);
+    importBtn.addEventListener('click', () => importFile.click());
+    importFile.addEventListener('change', importData);
 
-        // プロンプトリストのクラスを更新
-        promptList.className = `prompt-list ${mode}-mode`;
+    // ═══════════════════════════════════════════
+    //  グローバル関数（HTML inline から呼ばれる）
+    // ═══════════════════════════════════════════
 
-        // 表示モードをlocalStorageに保存
-        localStorage.setItem(DISPLAY_MODE_KEY, mode);
+    window.editPrompt = function (id) {
+        const p = prompts.find(x => x.id === id);
+        if (!p) return;
 
-        // プロンプトを再描画
+        document.getElementById('name').value    = p.name;
+        document.getElementById('comment').value = p.comment || '';
+        document.getElementById('tags').value    = p.tags.join(', ');
+        document.getElementById('prompt').value  = p.prompt;
+
+        editingId = id;
+        submitBtn.textContent = '更新';
+        cancelBtn.style.display = 'inline-flex';
+
+        // フォームまでスクロール
+        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.getElementById('name').focus();
+    };
+
+    window.deletePrompt = function (id) {
+        if (!confirm('このプロンプトを削除しますか？')) return;
+        prompts = prompts.filter(p => p.id !== id);
+        saveData();
+        renderPrompts();
+        showToast('🗑 削除しました');
+    };
+
+    window.copyPrompt = function (id) {
+        const p = prompts.find(x => x.id === id);
+        if (!p) return;
+        navigator.clipboard.writeText(p.prompt)
+            .then(() => showToast('✓ プロンプトをコピーしました'))
+            .catch(() => showToast('コピーに失敗しました', 4000));
+    };
+
+    window.setSearchTag = function (tag) {
+        searchInput.value = tag;
+        clearSearchBtn.style.display = 'flex';
+        // 部分一致モードにしてから検索
+        if (searchMode !== 'partial') {
+            searchMode = 'partial';
+            toggleModeBtn.textContent = '部分';
+            toggleModeBtn.classList.remove('exact-mode');
+        }
+        searchInput.dispatchEvent(new Event('input'));
+    };
+
+    // ═══════════════════════════════════════════
+    //  Core Functions
+    // ═══════════════════════════════════════════
+
+    function addOrUpdatePrompt() {
+        const name    = document.getElementById('name').value.trim();
+        const comment = document.getElementById('comment').value.trim();
+        const tagsRaw = document.getElementById('tags').value.trim();
+        const prompt  = document.getElementById('prompt').value.trim();
+
+        if (!name) {
+            showToast('⚠ 名前は必須です', 3500); return;
+        }
+        if (!prompt) {
+            showToast('⚠ プロンプトは必須です', 3500); return;
+        }
+
+        const tags = tagsRaw
+            ? tagsRaw.split(',').map(t => t.trim()).filter(t => t.length > 0)
+            : [];
+
+        if (editingId !== null) {
+            prompts = prompts.map(p =>
+                p.id === editingId
+                    ? { ...p, name, comment, tags, prompt }
+                    : p
+            );
+            showToast('✓ 更新しました');
+        } else {
+            prompts.push({ id: Date.now(), name, comment, tags, prompt });
+            showToast('✓ 追加しました');
+        }
+
+        if (isAutoSaveEnabled()) saveData();
+        resetForm();
         renderPrompts();
     }
 
-    function addPrompt() {
-        const name = document.getElementById('name').value.trim();
-        const comment = document.getElementById('comment').value.trim();
-        const tagsInput = document.getElementById('tags').value.trim();
-        const prompt = document.getElementById('prompt').value.trim();
-
-        if (!name || name.length < 1 || name.length > 80) {
-            alert('名前は1〜80文字で入力してください。');
-            return;
-        }
-
-        if (comment && (comment.length < 1 || comment.length > 200)) {
-            alert('コメントは1〜200文字で入力してください。');
-            return;
-        }
-
-        if (!prompt || prompt.length < 1 || prompt.length > 4000) {
-            alert('プロンプトは1〜4000文字で入力してください。');
-            return;
-        }
-
-        const tags = tagsInput ? tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag.length >= 1 && tag.length <= 20) : [];
-
-        if (tags.some(tag => tag.length < 1 || tag.length > 20)) {
-            alert('各タグは1〜20文字で入力してください。');
-            return;
-        }
-
-        if (editingId) {
-            // 更新
-            const updatedPrompt = {
-                id: editingId,
-                name,
-                comment,
-                tags,
-                prompt
-            };
-            prompts = prompts.map(p => p.id === editingId ? updatedPrompt : p);
-            editingId = null;
-            form.querySelector('button[type="submit"]').textContent = '追加';
-            cancelBtn.style.display = 'none';
-        } else {
-            // 新規追加
-            const newPrompt = {
-                id: Date.now(),
-                name,
-                comment,
-                tags,
-                prompt
-            };
-            prompts.push(newPrompt);
-        }
-
-        // 自動保存設定をチェックして保存
-        const autoSaveEnabled = localStorage.getItem('auto_save_enabled') !== 'false';
-        if (autoSaveEnabled) {
-            saveData();
-        }
-
+    function resetForm() {
+        editingId = null;
+        submitBtn.textContent = '追加';
+        cancelBtn.style.display = 'none';
         form.reset();
-        renderPrompts();
     }
 
     function renderPrompts() {
-        const searchTerm = searchInput.value.toLowerCase();
-        const filteredPrompts = prompts.filter(p => {
-            // 名前での検索
-            let nameMatch = false;
-            if (searchMode === 'partial') {
-                nameMatch = p.name.toLowerCase().includes(searchTerm);
-            } else { // exact mode
-                nameMatch = p.name.toLowerCase() === searchTerm;
-            }
+        const term = searchInput.value.toLowerCase();
 
-            // タグでの検索
-            let tagMatch = false;
-            if (searchMode === 'partial') {
-                tagMatch = p.tags.some(tag => tag.toLowerCase().includes(searchTerm));
-            } else { // exact mode
-                tagMatch = p.tags.some(tag => tag.toLowerCase() === searchTerm);
-            }
+        const filtered = term
+            ? prompts.filter(p => {
+                if (searchMode === 'partial') {
+                    return p.name.toLowerCase().includes(term) ||
+                           p.tags.some(t => t.toLowerCase().includes(term));
+                } else {
+                    return p.name.toLowerCase() === term ||
+                           p.tags.some(t => t.toLowerCase() === term);
+                }
+            })
+            : prompts;
 
-            return nameMatch || tagMatch;
-        });
+        // カウントバッジ更新
+        countBadge.textContent = filtered.length;
+
         promptList.innerHTML = '';
 
+        if (filtered.length === 0) {
+            promptList.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">✦</div>
+                    <p>${term ? '検索結果が見つかりません' : 'プロンプトがまだありません'}</p>
+                    <p style="font-size:12px;">${term ? '別のキーワードで検索してみてください' : '上のフォームから追加できます'}</p>
+                </div>`;
+            return;
+        }
+
         if (displayMode === 'list') {
-            // リストモード（テーブル形式）
-            const table = document.createElement('table');
-            table.className = 'prompt-table';
-            table.innerHTML = `
-                <thead>
-                    <tr>
-                        <th>名前</th>
-                        <th>コメント</th>
-                        <th>タグ</th>
-                        <th>プロンプト</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${filteredPrompts.map(prompt => `
-                        <tr>
-                            <td>${prompt.name}</td>
-                            <td>${prompt.comment || '-'}</td>
-                            <td>${prompt.tags.map(tag => `<span class="tag" onclick="setSearchTag('${tag}')">${tag}</span>`).join('')}</td>
-                            <td class="prompt-text-cell">${prompt.prompt}</td>
-                            <td class="actions-cell">
-                                <button class="copy" onclick="copyPrompt(${prompt.id})">コピー</button>
-                                <button class="edit" onclick="editPrompt(${prompt.id})">編集</button>
-                                <button class="delete" onclick="deletePrompt(${prompt.id})">削除</button>
-                            </td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            `;
-            promptList.appendChild(table);
+            renderListMode(filtered);
         } else {
-            // グリッドモード（カード形式）
-            filteredPrompts.forEach(prompt => {
-                const card = document.createElement('div');
-                card.className = 'prompt-card';
-                card.innerHTML = `
-                    <h3>${prompt.name}</h3>
-                    ${prompt.comment ? `<p><strong>コメント:</strong> ${prompt.comment}</p>` : ''}
-                    <div class="tags">
-                        ${prompt.tags.map(tag => `<span class="tag" onclick="setSearchTag('${tag}')">${tag}</span>`).join('')}
-                    </div>
-                    <p class="prompt-text">${prompt.prompt}</p>
-                    <div class="actions">
-                        <button class="copy" onclick="copyPrompt(${prompt.id})">コピー</button>
-                        <button class="edit" onclick="editPrompt(${prompt.id})">編集</button>
-                        <button class="delete" onclick="deletePrompt(${prompt.id})">削除</button>
-                    </div>
-                `;
-                promptList.appendChild(card);
-            });
+            renderGridMode(filtered);
         }
     }
 
-    window.editPrompt = function(id) {
-        const prompt = prompts.find(p => p.id === id);
-        if (!prompt) return;
-
-        document.getElementById('name').value = prompt.name;
-        document.getElementById('comment').value = prompt.comment;
-        document.getElementById('tags').value = prompt.tags.join(', ');
-        document.getElementById('prompt').value = prompt.prompt;
-
-        editingId = id;
-        form.querySelector('button[type="submit"]').textContent = '更新';
-        cancelBtn.style.display = 'inline-block';
-    };
-
-    window.deletePrompt = function(id) {
-        if (confirm('本当に削除しますか？')) {
-            prompts = prompts.filter(p => p.id !== id);
-            saveData();
-            renderPrompts();
-        }
-    };
-
-    window.setSearchTag = function(tag) {
-        const searchInput = document.getElementById('search');
-        searchInput.value = tag;
-        searchInput.dispatchEvent(new Event('input')); // 検索を即時実行
-    };
-
-    function showToast(message, duration = 3000) {
-        const toast = document.getElementById('toast');
-        toast.querySelector('.toast-message').textContent = message;
-        toast.classList.add('show');
-
-        setTimeout(() => {
-            toast.classList.remove('show');
-        }, duration);
-    }
-
-    window.copyPrompt = function(id) {
-        const prompt = prompts.find(p => p.id === id);
-        if (!prompt) return;
-
-        navigator.clipboard.writeText(prompt.prompt).then(function() {
-            showToast('プロンプトをコピーしました');
-        }).catch(function(err) {
-            showToast('コピーに失敗しました', 4000);
+    function renderGridMode(list) {
+        list.forEach(p => {
+            const card = document.createElement('div');
+            card.className = 'prompt-card';
+            card.innerHTML = `
+                <h3>${escHtml(p.name)}</h3>
+                ${p.comment ? `<p class="card-comment">${escHtml(p.comment)}</p>` : ''}
+                <div class="tags">
+                    ${p.tags.map(t => `<span class="tag" onclick="setSearchTag('${escHtml(t)}')">${escHtml(t)}</span>`).join('')}
+                </div>
+                <p class="prompt-text">${escHtml(p.prompt)}</p>
+                <div class="actions">
+                    <button class="copy"   onclick="copyPrompt(${p.id})">コピー</button>
+                    <button class="edit"   onclick="editPrompt(${p.id})">編集</button>
+                    <button class="delete" onclick="deletePrompt(${p.id})">削除</button>
+                </div>`;
+            promptList.appendChild(card);
         });
-    };
+    }
 
+    function renderListMode(list) {
+        const table = document.createElement('table');
+        table.className = 'prompt-table';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th>名前</th>
+                    <th>コメント</th>
+                    <th>タグ</th>
+                    <th>プロンプト</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${list.map(p => `
+                    <tr>
+                        <td>${escHtml(p.name)}</td>
+                        <td>${p.comment ? escHtml(p.comment) : '<span style="color:var(--text-muted)">—</span>'}</td>
+                        <td>${p.tags.map(t => `<span class="tag" onclick="setSearchTag('${escHtml(t)}')">${escHtml(t)}</span>`).join('')}</td>
+                        <td class="prompt-text-cell">${escHtml(p.prompt)}</td>
+                        <td class="actions-cell">
+                            <button class="copy"   onclick="copyPrompt(${p.id})">コピー</button>
+                            <button class="edit"   onclick="editPrompt(${p.id})">編集</button>
+                            <button class="delete" onclick="deletePrompt(${p.id})">削除</button>
+                        </td>
+                    </tr>`).join('')}
+            </tbody>`;
+        promptList.appendChild(table);
+    }
+
+    // ── Display mode ──
+    function setDisplayMode(mode) {
+        displayMode = mode;
+        promptList.className = `prompt-list${mode === 'list' ? ' list-mode' : ''}`;
+        gridModeBtn.classList.toggle('active', mode === 'grid');
+        listModeBtn.classList.toggle('active', mode === 'list');
+        localStorage.setItem(DISPLAY_KEY, mode);
+        renderPrompts();
+    }
+
+    // ── Storage ──
     function saveData() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts));
     }
 
     function loadData() {
-        const data = localStorage.getItem(STORAGE_KEY);
-        if (data) {
-            prompts = JSON.parse(data);
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+            try { prompts = JSON.parse(raw); } catch (_) { prompts = []; }
         }
 
-        // 保存された表示モードを読み込み
-        const savedMode = localStorage.getItem(DISPLAY_MODE_KEY);
-        if (savedMode && (savedMode === 'grid' || savedMode === 'list')) {
-            displayMode = savedMode;
-        }
+        const savedMode = localStorage.getItem(DISPLAY_KEY);
+        if (savedMode === 'grid' || savedMode === 'list') displayMode = savedMode;
 
-        // 保存された自動保存設定を読み込み
-        const autoSaveEnabled = localStorage.getItem('auto_save_enabled');
-        if (autoSaveEnabled !== null) {
-            autoSaveCheckbox.checked = autoSaveEnabled === 'true';
-        }
+        const savedAutoSave = localStorage.getItem(AUTO_SAVE_KEY);
+        if (savedAutoSave !== null) autoSaveChk.checked = savedAutoSave === 'true';
 
-        // 初期表示モードを設定
         setDisplayMode(displayMode);
     }
 
-    // モーダルを開く
+    function isAutoSaveEnabled() {
+        return localStorage.getItem(AUTO_SAVE_KEY) !== 'false';
+    }
+
+    // ── Modal ──
     function openSettingsModal() {
         settingsModal.classList.add('show');
-        document.body.style.overflow = 'hidden'; // 背景スクロールを無効化
+        document.body.style.overflow = 'hidden';
     }
 
-    // モーダルを閉じる
     function closeSettingsModal() {
         settingsModal.classList.remove('show');
-        document.body.style.overflow = ''; // 背景スクロールを有効化
+        document.body.style.overflow = '';
     }
 
+    // ── Export / Import ──
     function exportData() {
-        const dataStr = JSON.stringify(prompts, null, 2);
-        const blob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'prompts_data.json';
+        const json = JSON.stringify(prompts, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url  = URL.createObjectURL(blob);
+        const a    = Object.assign(document.createElement('a'), { href: url, download: 'prompts_data.json' });
         a.click();
         URL.revokeObjectURL(url);
+        showToast('📤 エクスポートしました');
     }
 
     function importData(e) {
         const file = e.target.files[0];
         if (!file) return;
-
         const reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onload = (ev) => {
             try {
-                const importedPrompts = JSON.parse(e.target.result);
-                if (Array.isArray(importedPrompts)) {
-                    prompts = importedPrompts;
+                const data = JSON.parse(ev.target.result);
+                if (Array.isArray(data)) {
+                    prompts = data;
                     saveData();
                     renderPrompts();
-                    alert('データをインポートしました。');
+                    showToast(`📥 ${data.length} 件インポートしました`);
+                    closeSettingsModal();
                 } else {
-                    alert('無効なファイル形式です。');
+                    showToast('⚠ 無効なファイル形式です', 4000);
                 }
-            } catch (error) {
-                alert('ファイルの読み込みに失敗しました。');
+            } catch (_) {
+                showToast('⚠ ファイルの読み込みに失敗しました', 4000);
             }
         };
         reader.readAsText(file);
         importFile.value = '';
+    }
+
+    // ── Toast ──
+    function showToast(message, duration = 2800) {
+        const toast = document.getElementById('toast');
+        toast.querySelector('.toast-message').textContent = message;
+        toast.classList.remove('show');
+        // Force reflow for re-animation
+        void toast.offsetWidth;
+        toast.classList.add('show');
+        clearTimeout(toast._timer);
+        toast._timer = setTimeout(() => toast.classList.remove('show'), duration);
+    }
+
+    // ── Utility ──
+    function escHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 });
