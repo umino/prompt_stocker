@@ -17,16 +17,28 @@ document.addEventListener('DOMContentLoaded', function () {
     const autoSaveChk    = document.getElementById('auto-save');
     const countBadge     = document.getElementById('count-badge');
     const bulkCopyBtn    = document.getElementById('bulk-copy-btn');
+    const sortSelect     = document.getElementById('sort-order');
+    const saveBtn        = document.getElementById('save-btn');
+    const fileLinkGroup  = document.getElementById('file-link-group');
+    const fileLinkBtn    = document.getElementById('file-link-btn');
+    const fileUnlinkBtn  = document.getElementById('file-unlink-btn');
+    const fileLinkStatus = document.getElementById('file-link-status');
 
     // ── State ──
     let prompts     = [];
     let editingId   = null;
     let displayMode = 'grid';
-    let searchMode  = 'partial';   // 'partial' | 'exact'
+    let searchMode  = 'partial';      // 'partial' | 'exact'
+    let sortOrder   = 'updated_desc'; // updated_desc | created_desc | created_asc | name_asc
+    let dirty       = false;          // 未保存の変更があるか（自動保存OFF時に使用）
+    let fileHandle  = null;           // File System Access API のハンドル
 
-    const STORAGE_KEY    = 'prompts_data';
-    const DISPLAY_KEY    = 'display_mode';
-    const AUTO_SAVE_KEY  = 'auto_save_enabled';
+    const STORAGE_KEY   = 'prompts_data';
+    const DISPLAY_KEY   = 'display_mode';
+    const AUTO_SAVE_KEY = 'auto_save_enabled';
+    const SORT_KEY      = 'sort_order';
+
+    const fsSupported = (typeof window.showSaveFilePicker === 'function');
 
     // ── 検索モード切替ボタン（動的生成） ──
     const toggleModeBtn = document.createElement('button');
@@ -34,12 +46,12 @@ document.addEventListener('DOMContentLoaded', function () {
     toggleModeBtn.textContent = '部分';
     toggleModeBtn.className = 'search-mode-toggle-btn';
     toggleModeBtn.title = '検索モードを切り替え';
-    // search-container の先頭 (input の前) に挿入
     const searchContainer = searchInput.parentNode;
     searchContainer.insertBefore(toggleModeBtn, searchInput);
 
     // ── 初期読み込み ──
     loadData();
+    restoreFileLink();
 
     // ═══════════════════════════════════════════
     //  イベントリスナー
@@ -51,10 +63,12 @@ document.addEventListener('DOMContentLoaded', function () {
         addOrUpdatePrompt();
     });
 
-    // 検索
+    // 検索（デバウンス）
+    let searchTimer;
     searchInput.addEventListener('input', function () {
         clearSearchBtn.style.display = this.value ? 'flex' : 'none';
-        renderPrompts();
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(renderPrompts, 150);
     });
 
     // 検索モード切替
@@ -71,6 +85,13 @@ document.addEventListener('DOMContentLoaded', function () {
         clearSearchBtn.style.display = 'none';
         renderPrompts();
         searchInput.focus();
+    });
+
+    // 並び替え
+    sortSelect.addEventListener('change', function () {
+        sortOrder = sortSelect.value;
+        localStorage.setItem(SORT_KEY, sortOrder);
+        renderPrompts();
     });
 
     // キャンセル
@@ -97,9 +118,18 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // 自動保存
+    // 自動保存トグル
     autoSaveChk.addEventListener('change', () => {
         localStorage.setItem(AUTO_SAVE_KEY, autoSaveChk.checked);
+        // OFF→ON に切り替えた際、未保存があれば即保存
+        if (autoSaveChk.checked && dirty) saveData();
+        updateSaveButton();
+    });
+
+    // 手動保存
+    saveBtn.addEventListener('click', () => {
+        saveData();
+        showToast('💾 保存しました');
     });
 
     // エクスポート / インポート
@@ -107,11 +137,46 @@ document.addEventListener('DOMContentLoaded', function () {
     importBtn.addEventListener('click', () => importFile.click());
     importFile.addEventListener('change', importData);
 
+    // ファイル連携
+    if (fsSupported) {
+        fileLinkBtn.addEventListener('click', linkFile);
+        fileUnlinkBtn.addEventListener('click', unlinkFile);
+    } else if (fileLinkGroup) {
+        fileLinkGroup.style.display = 'none';
+    }
+
+    // 未保存のまま離脱しようとしたら警告
+    window.addEventListener('beforeunload', (e) => {
+        if (dirty && !isAutoSaveEnabled()) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+
+    // 一覧のクリックを委譲で処理（インライン onclick を廃止＝XSS対策）
+    promptList.addEventListener('click', function (e) {
+        const tagEl = e.target.closest('.tag');
+        if (tagEl && promptList.contains(tagEl)) {
+            setSearchTag(tagEl.dataset.tag);
+            return;
+        }
+        const actionEl = e.target.closest('[data-action]');
+        if (!actionEl) return;
+        const row = actionEl.closest('[data-id]');
+        if (!row) return;
+        const id = row.dataset.id;
+        switch (actionEl.dataset.action) {
+            case 'copy':   copyPrompt(id);   break;
+            case 'edit':   editPrompt(id);   break;
+            case 'delete': deletePrompt(id); break;
+        }
+    });
+
     // ═══════════════════════════════════════════
-    //  グローバル関数（HTML inline から呼ばれる）
+    //  Record actions
     // ═══════════════════════════════════════════
 
-    window.editPrompt = function (id) {
+    function editPrompt(id) {
         const p = prompts.find(x => x.id === id);
         if (!p) return;
 
@@ -124,42 +189,41 @@ document.addEventListener('DOMContentLoaded', function () {
         submitBtn.textContent = '更新';
         cancelBtn.style.display = 'inline-flex';
 
-        // フォームまでスクロール
         form.scrollIntoView({ behavior: 'smooth', block: 'start' });
         document.getElementById('name').focus();
-    };
+    }
 
-    window.deletePrompt = function (id) {
+    function deletePrompt(id) {
         if (!confirm('このプロンプトを削除しますか？')) return;
         prompts = prompts.filter(p => p.id !== id);
-        saveData();
+        persist();
         renderPrompts();
         showToast('🗑 削除しました');
-    };
+    }
 
-    window.copyPrompt = function (id) {
+    function copyPrompt(id) {
         const p = prompts.find(x => x.id === id);
         if (!p) return;
         navigator.clipboard.writeText(p.prompt)
             .then(() => showToast('✓ プロンプトをコピーしました'))
             .catch(() => showToast('コピーに失敗しました', 4000));
-    };
+    }
+
+    function setSearchTag(tag) {
+        searchInput.value = tag;
+        clearSearchBtn.style.display = 'flex';
+        // 部分一致モードにしてから検索
+        if (searchMode !== 'partial') {
+            searchMode = 'partial';
+            toggleModeBtn.textContent = '部分';
+            toggleModeBtn.classList.remove('exact-mode');
+        }
+        renderPrompts();
+    }
 
     // ── 一括コピー ──
     function bulkCopyPrompts() {
-        // 現在のフィルタを再計算
-        const term = searchInput.value.toLowerCase();
-        const filtered = term
-            ? prompts.filter(p => {
-                if (searchMode === 'partial') {
-                    return p.name.toLowerCase().includes(term) ||
-                           p.tags.some(t => t.toLowerCase().includes(term));
-                } else {
-                    return p.name.toLowerCase() === term ||
-                           p.tags.some(t => t.toLowerCase() === term);
-                }
-            })
-            : prompts;
+        const filtered = getFiltered();
 
         if (filtered.length === 0) {
             showToast('⚠ コピー対象がありません', 2500);
@@ -167,14 +231,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         // 各プロンプトの改行を除去して1行化、改行で結合
-        const text = filtered
+        const text = sortList(filtered)
             .map(p => p.prompt.replace(/[\r\n]+/g, ' ').trim())
             .join('\n');
 
         navigator.clipboard.writeText(text)
             .then(() => {
                 showToast(`✓ ${filtered.length} 件のプロンプトをコピーしました`);
-                // ボタンに一時的な「成功」クラスを付与
                 bulkCopyBtn.classList.add('copied');
                 bulkCopyBtn.querySelector('.bulk-copy-label').textContent = `${filtered.length} 件コピー完了`;
                 clearTimeout(bulkCopyBtn._timer);
@@ -185,18 +248,6 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .catch(() => showToast('⚠ コピーに失敗しました', 3500));
     }
-
-    window.setSearchTag = function (tag) {
-        searchInput.value = tag;
-        clearSearchBtn.style.display = 'flex';
-        // 部分一致モードにしてから検索
-        if (searchMode !== 'partial') {
-            searchMode = 'partial';
-            toggleModeBtn.textContent = '部分';
-            toggleModeBtn.classList.remove('exact-mode');
-        }
-        searchInput.dispatchEvent(new Event('input'));
-    };
 
     // ═══════════════════════════════════════════
     //  Core Functions
@@ -215,23 +266,26 @@ document.addEventListener('DOMContentLoaded', function () {
             showToast('⚠ プロンプトは必須です', 3500); return;
         }
 
+        // タグ：前後空白除去・空要素除去・重複除去
         const tags = tagsRaw
-            ? tagsRaw.split(',').map(t => t.trim()).filter(t => t.length > 0)
+            ? [...new Set(tagsRaw.split(',').map(t => t.trim()).filter(t => t.length > 0))]
             : [];
+
+        const now = Date.now();
 
         if (editingId !== null) {
             prompts = prompts.map(p =>
                 p.id === editingId
-                    ? { ...p, name, comment, tags, prompt }
+                    ? { ...p, name, comment, tags, prompt, updatedAt: now }
                     : p
             );
             showToast('✓ 更新しました');
         } else {
-            prompts.push({ id: Date.now(), name, comment, tags, prompt });
+            prompts.push({ id: genId(), name, comment, tags, prompt, createdAt: now, updatedAt: now });
             showToast('✓ 追加しました');
         }
 
-        if (isAutoSaveEnabled()) saveData();
+        persist();
         resetForm();
         renderPrompts();
     }
@@ -243,24 +297,41 @@ document.addEventListener('DOMContentLoaded', function () {
         form.reset();
     }
 
+    // 現在の検索条件でフィルタした配列を返す（描画と一括コピーで共用）
+    function getFiltered() {
+        const term = searchInput.value.trim().toLowerCase();
+        if (!term) return prompts;
+
+        return prompts.filter(p => {
+            if (searchMode === 'partial') {
+                return p.name.toLowerCase().includes(term)
+                    || (p.comment && p.comment.toLowerCase().includes(term))
+                    || p.prompt.toLowerCase().includes(term)
+                    || p.tags.some(t => t.toLowerCase().includes(term));
+            }
+            // exact: 名前・タグの完全一致
+            return p.name.toLowerCase() === term
+                || p.tags.some(t => t.toLowerCase() === term);
+        });
+    }
+
+    function sortList(list) {
+        const arr = list.slice();
+        switch (sortOrder) {
+            case 'created_desc': arr.sort((a, b) => b.createdAt - a.createdAt); break;
+            case 'created_asc':  arr.sort((a, b) => a.createdAt - b.createdAt); break;
+            case 'name_asc':     arr.sort((a, b) => a.name.localeCompare(b.name, 'ja')); break;
+            case 'updated_desc':
+            default:             arr.sort((a, b) => b.updatedAt - a.updatedAt); break;
+        }
+        return arr;
+    }
+
     function renderPrompts() {
-        const term = searchInput.value.toLowerCase();
+        const term = searchInput.value.trim();
+        const filtered = sortList(getFiltered());
 
-        const filtered = term
-            ? prompts.filter(p => {
-                if (searchMode === 'partial') {
-                    return p.name.toLowerCase().includes(term) ||
-                           p.tags.some(t => t.toLowerCase().includes(term));
-                } else {
-                    return p.name.toLowerCase() === term ||
-                           p.tags.some(t => t.toLowerCase() === term);
-                }
-            })
-            : prompts;
-
-        // カウントバッジ更新
         countBadge.textContent = filtered.length;
-
         promptList.innerHTML = '';
 
         if (filtered.length === 0) {
@@ -281,23 +352,26 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderGridMode(list) {
+        const frag = document.createDocumentFragment();
         list.forEach(p => {
             const card = document.createElement('div');
             card.className = 'prompt-card';
+            card.dataset.id = p.id;
             card.innerHTML = `
                 <h3>${escHtml(p.name)}</h3>
                 ${p.comment ? `<p class="card-comment">${escHtml(p.comment)}</p>` : ''}
                 <div class="tags">
-                    ${p.tags.map(t => `<span class="tag" onclick="setSearchTag('${escHtml(t)}')">${escHtml(t)}</span>`).join('')}
+                    ${p.tags.map(t => `<button type="button" class="tag" data-tag="${escHtml(t)}">${escHtml(t)}</button>`).join('')}
                 </div>
                 <p class="prompt-text">${escHtml(p.prompt)}</p>
                 <div class="actions">
-                    <button class="copy"   onclick="copyPrompt(${p.id})">コピー</button>
-                    <button class="edit"   onclick="editPrompt(${p.id})">編集</button>
-                    <button class="delete" onclick="deletePrompt(${p.id})">削除</button>
+                    <button type="button" class="copy"   data-action="copy">コピー</button>
+                    <button type="button" class="edit"   data-action="edit">編集</button>
+                    <button type="button" class="delete" data-action="delete">削除</button>
                 </div>`;
-            promptList.appendChild(card);
+            frag.appendChild(card);
         });
+        promptList.appendChild(frag);
     }
 
     function renderListMode(list) {
@@ -315,15 +389,15 @@ document.addEventListener('DOMContentLoaded', function () {
             </thead>
             <tbody>
                 ${list.map(p => `
-                    <tr>
+                    <tr data-id="${escHtml(p.id)}">
                         <td>${escHtml(p.name)}</td>
                         <td>${p.comment ? escHtml(p.comment) : '<span style="color:var(--text-muted)">—</span>'}</td>
-                        <td>${p.tags.map(t => `<span class="tag" onclick="setSearchTag('${escHtml(t)}')">${escHtml(t)}</span>`).join('')}</td>
+                        <td>${p.tags.map(t => `<button type="button" class="tag" data-tag="${escHtml(t)}">${escHtml(t)}</button>`).join('')}</td>
                         <td class="prompt-text-cell">${escHtml(p.prompt)}</td>
                         <td class="actions-cell">
-                            <button class="copy"   onclick="copyPrompt(${p.id})">コピー</button>
-                            <button class="edit"   onclick="editPrompt(${p.id})">編集</button>
-                            <button class="delete" onclick="deletePrompt(${p.id})">削除</button>
+                            <button type="button" class="copy"   data-action="copy">コピー</button>
+                            <button type="button" class="edit"   data-action="edit">編集</button>
+                            <button type="button" class="delete" data-action="delete">削除</button>
                         </td>
                     </tr>`).join('')}
             </tbody>`;
@@ -340,23 +414,55 @@ document.addEventListener('DOMContentLoaded', function () {
         renderPrompts();
     }
 
-    // ── Storage ──
+    // ═══════════════════════════════════════════
+    //  Storage / persistence
+    // ═══════════════════════════════════════════
+
+    // 変更を反映：自動保存ONなら即保存、OFFなら未保存フラグを立てる
+    function persist() {
+        if (isAutoSaveEnabled()) {
+            saveData();
+        } else {
+            dirty = true;
+            updateSaveButton();
+        }
+    }
+
     function saveData() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts));
+        dirty = false;
+        updateSaveButton();
+        writeToFile();   // 連携中なら実ファイルにも書き出し
     }
 
     function loadData() {
         const raw = localStorage.getItem(STORAGE_KEY);
+        let needsResave = false;
         if (raw) {
-            try { prompts = JSON.parse(raw); } catch (_) { prompts = []; }
+            try {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    const result = migrate(parsed);
+                    prompts = result.records;
+                    needsResave = result.changed;
+                }
+            } catch (_) { prompts = []; }
         }
 
         const savedMode = localStorage.getItem(DISPLAY_KEY);
         if (savedMode === 'grid' || savedMode === 'list') displayMode = savedMode;
 
+        const savedSort = localStorage.getItem(SORT_KEY);
+        if (savedSort) sortOrder = savedSort;
+        sortSelect.value = sortOrder;
+
         const savedAutoSave = localStorage.getItem(AUTO_SAVE_KEY);
         if (savedAutoSave !== null) autoSaveChk.checked = savedAutoSave === 'true';
 
+        // マイグレーションで形が変わっていれば保存し直す（自動保存設定に依らず実施）
+        if (needsResave) localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts));
+
+        updateSaveButton();
         setDisplayMode(displayMode);
     }
 
@@ -364,10 +470,76 @@ document.addEventListener('DOMContentLoaded', function () {
         return localStorage.getItem(AUTO_SAVE_KEY) !== 'false';
     }
 
+    function updateSaveButton() {
+        const off = !isAutoSaveEnabled();
+        saveBtn.style.display = off ? 'inline-flex' : 'none';
+        saveBtn.classList.toggle('has-changes', off && dirty);
+        saveBtn.textContent = dirty ? '● 保存' : '保存';
+    }
+
+    // ── レコード正規化 / マイグレーション ──
+    function genId() {
+        if (window.crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+        return 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+    }
+
+    function toStr(v) {
+        return typeof v === 'string' ? v : (v != null ? String(v) : '');
+    }
+
+    // 任意の入力を安全なレコード形へ整える（不正なら null）
+    function normalizeRecord(obj) {
+        if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+
+        const name   = toStr(obj.name).trim();
+        const prompt = toStr(obj.prompt);
+        // 名前・プロンプトが両方空なら無効レコードとして弾く
+        if (!name && !prompt.trim()) return null;
+
+        const id = (obj.id === undefined || obj.id === null || obj.id === '')
+            ? genId()
+            : String(obj.id);
+
+        const comment = toStr(obj.comment);
+
+        const tags = Array.isArray(obj.tags)
+            ? [...new Set(obj.tags.filter(t => typeof t === 'string').map(t => t.trim()).filter(Boolean))]
+            : [];
+
+        // createdAt：無ければ数値レガシーID（Date.now由来）→ それも無ければ現在時刻
+        let createdAt = Number(obj.createdAt);
+        if (!createdAt || Number.isNaN(createdAt)) {
+            const legacy = Number(obj.id);
+            createdAt = (!Number.isNaN(legacy) && legacy > 0) ? legacy : Date.now();
+        }
+        let updatedAt = Number(obj.updatedAt);
+        if (!updatedAt || Number.isNaN(updatedAt)) updatedAt = createdAt;
+
+        return { id, name, comment, tags, prompt, createdAt, updatedAt };
+    }
+
+    // 配列を正規化し、形が変わったかを返す
+    function migrate(arr) {
+        let changed = false;
+        const records = [];
+        for (const item of arr) {
+            const r = normalizeRecord(item);
+            if (!r) { changed = true; continue; }
+            if (!changed) {
+                const before = JSON.stringify(item);
+                const after  = JSON.stringify(r);
+                if (before !== after) changed = true;
+            }
+            records.push(r);
+        }
+        return { records, changed };
+    }
+
     // ── Modal ──
     function openSettingsModal() {
         settingsModal.classList.add('show');
         document.body.style.overflow = 'hidden';
+        updateFileStatus();
     }
 
     function closeSettingsModal() {
@@ -393,15 +565,28 @@ document.addEventListener('DOMContentLoaded', function () {
         reader.onload = (ev) => {
             try {
                 const data = JSON.parse(ev.target.result);
-                if (Array.isArray(data)) {
-                    prompts = data;
-                    saveData();
-                    renderPrompts();
-                    showToast(`📥 ${data.length} 件インポートしました`);
-                    closeSettingsModal();
-                } else {
-                    showToast('⚠ 無効なファイル形式です', 4000);
+                if (!Array.isArray(data)) {
+                    showToast('⚠ 無効なファイル形式です（配列ではありません）', 4000);
+                    return;
                 }
+
+                const { records } = migrate(data);
+                if (records.length === 0) {
+                    showToast('⚠ 取り込めるレコードがありませんでした', 4000);
+                    return;
+                }
+
+                // 既存データがある場合は全置換の確認
+                if (prompts.length > 0 &&
+                    !confirm(`現在の ${prompts.length} 件を、インポートした ${records.length} 件で置き換えます。よろしいですか？`)) {
+                    return;
+                }
+
+                prompts = records;
+                saveData();
+                renderPrompts();
+                showToast(`📥 ${records.length} 件インポートしました`);
+                closeSettingsModal();
             } catch (_) {
                 showToast('⚠ ファイルの読み込みに失敗しました', 4000);
             }
@@ -410,13 +595,128 @@ document.addEventListener('DOMContentLoaded', function () {
         importFile.value = '';
     }
 
+    // ═══════════════════════════════════════════
+    //  File System Access API（実ファイル連携・任意）
+    // ═══════════════════════════════════════════
+
+    const IDB_NAME  = 'prompt_stocker';
+    const IDB_STORE = 'handles';
+    const HANDLE_KEY = 'fileHandle';
+
+    function idbOpen() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(IDB_NAME, 1);
+            req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror   = () => reject(req.error);
+        });
+    }
+
+    async function idbSet(key, val) {
+        const db = await idbOpen();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(IDB_STORE, 'readwrite');
+            tx.objectStore(IDB_STORE).put(val, key);
+            tx.oncomplete = () => resolve();
+            tx.onerror    = () => reject(tx.error);
+        });
+    }
+
+    async function idbGet(key) {
+        const db = await idbOpen();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(IDB_STORE, 'readonly');
+            const rq = tx.objectStore(IDB_STORE).get(key);
+            rq.onsuccess = () => resolve(rq.result);
+            rq.onerror   = () => reject(rq.error);
+        });
+    }
+
+    async function idbDel(key) {
+        const db = await idbOpen();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(IDB_STORE, 'readwrite');
+            tx.objectStore(IDB_STORE).delete(key);
+            tx.oncomplete = () => resolve();
+            tx.onerror    = () => reject(tx.error);
+        });
+    }
+
+    async function ensurePermission(handle, write) {
+        const opts = { mode: write ? 'readwrite' : 'read' };
+        if ((await handle.queryPermission(opts)) === 'granted') return true;
+        if ((await handle.requestPermission(opts)) === 'granted') return true;
+        return false;
+    }
+
+    async function linkFile() {
+        try {
+            const handle = await window.showSaveFilePicker({
+                suggestedName: 'prompts_data.json',
+                types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+            });
+            fileHandle = handle;
+            await idbSet(HANDLE_KEY, handle);
+            await writeToFile();
+            updateFileStatus();
+            showToast('📁 ファイルと連携しました');
+        } catch (err) {
+            if (err && err.name === 'AbortError') return;
+            showToast('⚠ ファイル連携に失敗しました', 4000);
+        }
+    }
+
+    async function unlinkFile() {
+        fileHandle = null;
+        try { await idbDel(HANDLE_KEY); } catch (_) {}
+        updateFileStatus();
+        showToast('ファイル連携を解除しました');
+    }
+
+    async function writeToFile() {
+        if (!fileHandle) return;
+        try {
+            if (!(await ensurePermission(fileHandle, true))) return;
+            const writable = await fileHandle.createWritable();
+            await writable.write(JSON.stringify(prompts, null, 2));
+            await writable.close();
+        } catch (err) {
+            console.warn('ファイル書き込みに失敗しました', err);
+        }
+    }
+
+    async function restoreFileLink() {
+        if (!fsSupported) return;
+        try {
+            const handle = await idbGet(HANDLE_KEY);
+            if (handle) {
+                fileHandle = handle;
+                updateFileStatus();
+            }
+        } catch (_) {}
+    }
+
+    function updateFileStatus() {
+        if (!fsSupported || !fileLinkStatus) return;
+        if (fileHandle) {
+            fileLinkStatus.textContent = `連携中: ${fileHandle.name}`;
+            fileLinkStatus.classList.add('linked');
+            fileLinkBtn.textContent = '📁 別のファイルに切り替え';
+            fileUnlinkBtn.style.display = 'flex';
+        } else {
+            fileLinkStatus.textContent = '未連携';
+            fileLinkStatus.classList.remove('linked');
+            fileLinkBtn.textContent = '📁 ファイルと連携する';
+            fileUnlinkBtn.style.display = 'none';
+        }
+    }
+
     // ── Toast ──
     function showToast(message, duration = 2800) {
         const toast = document.getElementById('toast');
         toast.querySelector('.toast-message').textContent = message;
         toast.classList.remove('show');
-        // Force reflow for re-animation
-        void toast.offsetWidth;
+        void toast.offsetWidth; // 再アニメーションのための強制リフロー
         toast.classList.add('show');
         clearTimeout(toast._timer);
         toast._timer = setTimeout(() => toast.classList.remove('show'), duration);

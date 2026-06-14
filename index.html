@@ -16,7 +16,10 @@
         <!-- ── Header ── -->
         <div class="header-section">
             <h1>Prompt Stocker</h1>
-            <button id="settings-btn" class="settings-btn" title="設定" aria-label="設定を開く">⚙</button>
+            <div class="header-actions">
+                <button id="save-btn" class="save-btn" style="display:none;" title="変更を保存" aria-label="変更を保存">保存</button>
+                <button id="settings-btn" class="settings-btn" title="設定" aria-label="設定を開く">⚙</button>
+            </div>
         </div>
 
         <!-- ── 入力フォーム ── -->
@@ -77,6 +80,12 @@
                     </div>
                 </div>
                 <div class="mode-controls">
+                    <select id="sort-order" class="sort-select" title="並び替え" aria-label="並び替え">
+                        <option value="updated_desc">更新が新しい順</option>
+                        <option value="created_desc">追加が新しい順</option>
+                        <option value="created_asc">追加が古い順</option>
+                        <option value="name_asc">名前順</option>
+                    </select>
                     <button id="bulk-copy-btn" class="bulk-copy-btn" title="フィルタ中のプロンプトを全件コピー（1行1件）" aria-label="一括コピー">
                         <span class="bulk-copy-icon">⎘</span>
                         <span class="bulk-copy-label">一括コピー</span>
@@ -106,6 +115,13 @@
                     <button id="export-btn" class="modal-btn">📤 データをエクスポート (.json)</button>
                     <button id="import-btn" class="modal-btn">📥 データをインポート (.json)</button>
                     <input type="file" id="import-file" accept=".json" style="display:none;">
+                </div>
+                <div class="settings-group" id="file-link-group">
+                    <h4>ファイル連携（自動保存）</h4>
+                    <p id="file-link-status" class="file-link-status">未連携</p>
+                    <button id="file-link-btn" class="modal-btn">📁 ファイルと連携する</button>
+                    <button id="file-unlink-btn" class="modal-btn" style="display:none;">🔌 連携を解除</button>
+                    <p class="file-link-note">連携すると、変更のたびに選択した JSON ファイルへ自動保存します。ファイルをコピーすればバックアップになります。</p>
                 </div>
                 <div class="settings-group">
                     <h4>表示設定</h4>
