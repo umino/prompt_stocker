@@ -23,6 +23,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const fileLinkBtn    = document.getElementById('file-link-btn');
     const fileUnlinkBtn  = document.getElementById('file-unlink-btn');
     const fileLinkStatus = document.getElementById('file-link-status');
+    const favoritesChips = document.getElementById('favorites-chips');
+    const favoritesAddForm = document.getElementById('favorites-add-form');
+    const favoriteInput  = document.getElementById('favorite-input');
+    const allTagsList    = document.getElementById('all-tags-list');
 
     // ── State ──
     let prompts     = [];
@@ -32,11 +36,14 @@ document.addEventListener('DOMContentLoaded', function () {
     let sortOrder   = 'updated_desc'; // updated_desc | created_desc | created_asc | name_asc
     let dirty       = false;          // 未保存の変更があるか（自動保存OFF時に使用）
     let fileHandle  = null;           // File System Access API のハンドル
+    let favoriteTags    = [];         // お気に入りタグ一覧（永続化）
+    let activeFavorites = new Set();  // 現在 ON のお気に入りタグ（セッション内）
 
     const STORAGE_KEY   = 'prompts_data';
     const DISPLAY_KEY   = 'display_mode';
     const AUTO_SAVE_KEY = 'auto_save_enabled';
     const SORT_KEY      = 'sort_order';
+    const FAVORITES_KEY = 'favorite_tags';
 
     const fsSupported = (typeof window.showSaveFilePicker === 'function');
 
@@ -92,6 +99,20 @@ document.addEventListener('DOMContentLoaded', function () {
         sortOrder = sortSelect.value;
         localStorage.setItem(SORT_KEY, sortOrder);
         renderPrompts();
+    });
+
+    // お気に入り追加
+    favoritesAddForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        addFavorite(favoriteInput.value);
+    });
+
+    // お気に入りチップ（トグル / 削除）の委譲
+    favoritesChips.addEventListener('click', function (e) {
+        const toggleEl = e.target.closest('[data-fav-toggle]');
+        if (toggleEl) { toggleFavorite(toggleEl.dataset.favToggle); return; }
+        const removeEl = e.target.closest('[data-fav-remove]');
+        if (removeEl) { removeFavorite(removeEl.dataset.favRemove); }
     });
 
     // キャンセル
@@ -300,9 +321,17 @@ document.addEventListener('DOMContentLoaded', function () {
     // 現在の検索条件でフィルタした配列を返す（描画と一括コピーで共用）
     function getFiltered() {
         const term = searchInput.value.trim().toLowerCase();
-        if (!term) return prompts;
+        const favs = [...activeFavorites];
 
         return prompts.filter(p => {
+            // お気に入り AND：ON のタグをすべて持つものだけ通す
+            if (favs.length) {
+                const lower = p.tags.map(t => t.toLowerCase());
+                if (!favs.every(f => lower.includes(f.toLowerCase()))) return false;
+            }
+
+            if (!term) return true;
+
             if (searchMode === 'partial') {
                 return p.name.toLowerCase().includes(term)
                     || (p.comment && p.comment.toLowerCase().includes(term))
@@ -328,18 +357,19 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderPrompts() {
-        const term = searchInput.value.trim();
+        const filtering = searchInput.value.trim() || activeFavorites.size > 0;
         const filtered = sortList(getFiltered());
 
         countBadge.textContent = filtered.length;
+        updateTagDatalist();
         promptList.innerHTML = '';
 
         if (filtered.length === 0) {
             promptList.innerHTML = `
                 <div class="empty-state">
                     <div class="empty-state-icon">✦</div>
-                    <p>${term ? '検索結果が見つかりません' : 'プロンプトがまだありません'}</p>
-                    <p style="font-size:12px;">${term ? '別のキーワードで検索してみてください' : '上のフォームから追加できます'}</p>
+                    <p>${filtering ? '条件に合うプロンプトがありません' : 'プロンプトがまだありません'}</p>
+                    <p style="font-size:12px;">${filtering ? '検索語やお気に入りの絞り込みを見直してみてください' : '上のフォームから追加できます'}</p>
                 </div>`;
             return;
         }
@@ -415,6 +445,75 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // ═══════════════════════════════════════════
+    //  お気に入りタグ
+    // ═══════════════════════════════════════════
+
+    function saveFavorites() {
+        localStorage.setItem(FAVORITES_KEY, JSON.stringify(favoriteTags));
+    }
+
+    function addFavorite(raw) {
+        const tag = (raw || '').trim();
+        if (!tag) return;
+        if (favoriteTags.some(t => t.toLowerCase() === tag.toLowerCase())) {
+            showToast('⚠ すでにお気に入りに登録済みです', 2500);
+            return;
+        }
+        favoriteTags.push(tag);
+        saveFavorites();
+        favoriteInput.value = '';
+        renderFavorites();
+        showToast(`⭐ 「${tag}」をお気に入りに追加しました`);
+    }
+
+    function removeFavorite(tag) {
+        favoriteTags = favoriteTags.filter(t => t !== tag);
+        const wasActive = activeFavorites.delete(tag);
+        saveFavorites();
+        renderFavorites();
+        if (wasActive) renderPrompts();
+    }
+
+    function toggleFavorite(tag) {
+        if (activeFavorites.has(tag)) activeFavorites.delete(tag);
+        else activeFavorites.add(tag);
+        renderFavorites();
+        renderPrompts();
+    }
+
+    function renderFavorites() {
+        if (favoriteTags.length === 0) {
+            favoritesChips.innerHTML = '<span class="favorites-hint">よく使うタグを登録すると、ここからワンクリックで絞り込めます</span>';
+            return;
+        }
+        favoritesChips.innerHTML = favoriteTags.map(t => {
+            const on = activeFavorites.has(t);
+            return `
+                <span class="fav-chip${on ? ' active' : ''}">
+                    <button type="button" class="fav-chip-toggle" data-fav-toggle="${escHtml(t)}"
+                            aria-pressed="${on}">${escHtml(t)}</button>
+                    <button type="button" class="fav-chip-remove" data-fav-remove="${escHtml(t)}"
+                            title="お気に入りから削除" aria-label="お気に入りから削除">×</button>
+                </span>`;
+        }).join('');
+    }
+
+    // 全プロンプトのタグを重複除去・ソートして返す
+    function getAllTags() {
+        const set = new Set();
+        prompts.forEach(p => p.tags.forEach(t => set.add(t)));
+        return [...set].sort((a, b) => a.localeCompare(b, 'ja'));
+    }
+
+    // datalist（お気に入り追加の補完候補）を更新
+    function updateTagDatalist() {
+        if (!allTagsList) return;
+        allTagsList.innerHTML = getAllTags()
+            .map(t => `<option value="${escHtml(t)}"></option>`)
+            .join('');
+    }
+
+    // ═══════════════════════════════════════════
     //  Storage / persistence
     // ═══════════════════════════════════════════
 
@@ -459,10 +558,24 @@ document.addEventListener('DOMContentLoaded', function () {
         const savedAutoSave = localStorage.getItem(AUTO_SAVE_KEY);
         if (savedAutoSave !== null) autoSaveChk.checked = savedAutoSave === 'true';
 
+        // お気に入りタグの読み込み（配列・文字列のみ・重複除去で正規化）
+        const rawFav = localStorage.getItem(FAVORITES_KEY);
+        if (rawFav) {
+            try {
+                const parsedFav = JSON.parse(rawFav);
+                if (Array.isArray(parsedFav)) {
+                    favoriteTags = [...new Set(
+                        parsedFav.filter(t => typeof t === 'string').map(t => t.trim()).filter(Boolean)
+                    )];
+                }
+            } catch (_) { favoriteTags = []; }
+        }
+
         // マイグレーションで形が変わっていれば保存し直す（自動保存設定に依らず実施）
         if (needsResave) localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts));
 
         updateSaveButton();
+        renderFavorites();
         setDisplayMode(displayMode);
     }
 

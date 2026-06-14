@@ -95,6 +95,18 @@
                 </div>
             </div>
 
+            <!-- お気に入りタグバー -->
+            <div class="favorites-bar" id="favorites-bar">
+                <span class="favorites-icon" title="お気に入りタグ">⭐</span>
+                <div class="favorites-chips" id="favorites-chips"></div>
+                <form class="favorites-add" id="favorites-add-form">
+                    <input type="text" id="favorite-input" list="all-tags-list"
+                           placeholder="お気に入りタグを追加" maxlength="40" autocomplete="off">
+                    <button type="submit" class="fav-add-btn" title="追加" aria-label="お気に入りに追加">＋</button>
+                </form>
+                <datalist id="all-tags-list"></datalist>
+            </div>
+
             <!-- スクロール可能エリア -->
             <div class="prompt-list-container">
                 <div id="prompt-list" class="prompt-list"></div>

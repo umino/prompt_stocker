@@ -1085,3 +1085,142 @@ button.tag {
   margin-top: 8px;
 }
 
+/* ── お気に入りタグバー ── */
+.favorites-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+
+.favorites-icon {
+  font-size: 15px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.favorites-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.favorites-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* チップ：トグル + 削除をまとめた pill */
+.fav-chip {
+  display: inline-flex;
+  align-items: stretch;
+  background: rgba(155,89,255,.12);
+  border: 1px solid rgba(155,89,255,.25);
+  border-radius: 20px;
+  overflow: hidden;
+  transition: var(--transition-fast);
+}
+
+.fav-chip-toggle {
+  background: none;
+  border: none;
+  color: #b78fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 4px 3px 11px;
+  cursor: pointer;
+  line-height: 1.6;
+  margin: 0;
+  border-radius: 0;
+}
+
+.fav-chip-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 9px 0 5px;
+  cursor: pointer;
+  margin: 0;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+}
+
+.fav-chip:hover {
+  border-color: var(--accent-purple);
+}
+
+.fav-chip-remove:hover {
+  color: var(--accent-pink);
+}
+
+/* ON 状態 */
+.fav-chip.active {
+  background: var(--grad-primary);
+  border-color: transparent;
+  box-shadow: var(--shadow-glow-purple);
+}
+
+.fav-chip.active .fav-chip-toggle { color: #fff; }
+.fav-chip.active .fav-chip-remove { color: rgba(255,255,255,.7); }
+.fav-chip.active .fav-chip-remove:hover { color: #fff; }
+
+/* 追加フォーム */
+.favorites-add {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+#favorite-input {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 20px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  padding: 5px 12px;
+  width: 150px;
+  outline: none;
+  transition: var(--transition-fast);
+}
+
+#favorite-input::placeholder { color: var(--text-muted); }
+
+#favorite-input:focus {
+  border-color: var(--accent-purple);
+  box-shadow: 0 0 0 3px rgba(155,89,255,.12);
+}
+
+.fav-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--bg-elevated);
+  color: var(--accent-purple);
+  border: 1px solid var(--border-default);
+  border-radius: 50%;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  flex-shrink: 0;
+  transition: var(--transition-fast);
+}
+
+.fav-add-btn:hover {
+  background: rgba(155,89,255,.18);
+  border-color: var(--accent-purple);
+}
+
